@@ -1,6 +1,6 @@
 {
-  "name": "Fabridata Finanças Pessoais",
-  "short_name": "Fabridata",
+  "name": "Finanças Pessoais",
+  "short_name": "Finanças",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
