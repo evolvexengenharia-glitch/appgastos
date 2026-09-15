@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fabridata-v1';
+const CACHE_NAME = 'fabridata-v2';
 const ARQUIVOS = [
   './index.html',
   './manifest.json',
@@ -17,7 +17,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
 });
 

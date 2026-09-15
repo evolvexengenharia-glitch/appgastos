@@ -30,6 +30,7 @@
     color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     padding:16px;
+    padding-bottom:110px;
   }
   h1{font-size:20px;font-weight:600;margin:0 0 16px 4px;}
   .card{
@@ -93,6 +94,7 @@
   .metric-value{font-size:26px;font-weight:700;margin-top:6px;}
   .metric-card canvas{margin-top:8px;height:36px !important;}
   .section-title{font-size:14px;font-weight:600;margin-bottom:10px;color:var(--muted);}
+
   .cat-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
   .cat-card{
     background:var(--card2);
@@ -111,15 +113,49 @@
   }
   .cat-info .cat-label{font-size:12px;color:var(--muted);}
   .cat-info .cat-value{font-size:15px;font-weight:600;}
+
+  .forma-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:800px){.forma-cards{grid-template-columns:repeat(2,1fr);}}
+  .forma-card{
+    background:var(--card2);
+    border-left:4px solid var(--orange1);
+    border-radius:10px;
+    padding:12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .forma-icon{
+    width:36px;height:36px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;color:#fff;flex-shrink:0;
+  }
+  .forma-info .forma-label{font-size:12px;color:var(--muted);}
+  .forma-info .forma-value{font-size:15px;font-weight:600;}
+
+  .fab-group{
+    position:fixed;bottom:22px;right:22px;z-index:40;
+    display:flex;flex-direction:column;gap:12px;align-items:center;
+  }
   .fab{
-    position:fixed;bottom:22px;right:22px;
     width:56px;height:56px;border-radius:50%;
-    background:linear-gradient(135deg,var(--cyan),#2b7ea8);
     display:flex;align-items:center;justify-content:center;
     font-size:24px;cursor:pointer;
     box-shadow:0 6px 16px rgba(0,0,0,.4);
     border:none;color:white;
   }
+  .fab-add{background:linear-gradient(135deg,var(--cyan),#2b7ea8);}
+  .fab-mic{
+    background:linear-gradient(135deg,var(--orange1),var(--orange2));
+    width:66px;height:66px;font-size:28px;
+  }
+  .fab-mic.ouvindo{ animation:pulse 1s infinite; }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(255,122,60,.6); }
+    70%{ box-shadow:0 0 0 14px rgba(255,122,60,0); }
+    100%{ box-shadow:0 0 0 0 rgba(255,122,60,0); }
+  }
+
   .modal-overlay{
     position:fixed;inset:0;background:rgba(0,0,0,.6);
     display:none;align-items:flex-end;justify-content:center;z-index:50;
@@ -138,6 +174,12 @@
   .btn-primary{background:var(--cyan);color:#04222b;border:none;font-weight:600;}
   .preview{
     font-size:12px;color:var(--muted);margin-top:6px;min-height:16px;
+  }
+  .mic-inline{
+    display:flex;align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:50%;
+    background:var(--card2);border:1px solid #2a355c;
+    margin-top:6px;cursor:pointer;font-size:16px;
   }
 </style>
 </head>
@@ -210,6 +252,11 @@
     <canvas id="sparklineDespesas"></canvas>
   </div>
 
+  <div class="col-4 card">
+    <div class="section-title">Gastos por forma de pagamento</div>
+    <div class="forma-cards" id="formaCards"></div>
+  </div>
+
   <div class="col-2 card">
     <div class="section-title">Top 5 Entradas por categoria</div>
     <canvas id="chartTopEntradas" height="140"></canvas>
@@ -232,7 +279,10 @@
 
 </div>
 
-<button class="fab" id="fabAdd">+</button>
+<div class="fab-group">
+  <button class="fab fab-mic" id="fabMic" title="Registrar por voz">🎤</button>
+  <button class="fab fab-add" id="fabAdd" title="Nova transação">+</button>
+</div>
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -240,6 +290,7 @@
     <div class="row">
       <label>Fale ou digite (ex: "Gastei 200 reais no supermercado no pix")</label>
       <textarea id="inputTexto" rows="3" placeholder="Toque no microfone do teclado para falar"></textarea>
+      <div id="micInlineWrap"></div>
       <div class="preview" id="previewInterpretacao"></div>
     </div>
     <div class="row">
@@ -288,6 +339,20 @@ const entradaCategorias = {
   'Salário': ['salário','salario'],
   '13º salário': ['13º','13o','decimo terceiro','décimo terceiro'],
   'Outras Receitas': []
+};
+
+const formasPagamento = ['Cartão Black','Cartão Luiza','Pix','Dinheiro'];
+const formaCores = {
+  'Cartão Black':'#4a4a4a',
+  'Cartão Luiza':'#ff7a3c',
+  'Pix':'#32bcad',
+  'Dinheiro':'#3ddc84'
+};
+const formaIcones = {
+  'Cartão Black':'⬛',
+  'Cartão Luiza':'💳',
+  'Pix':'💠',
+  'Dinheiro':'💵'
 };
 
 function parseTexto(texto){
@@ -380,6 +445,18 @@ function destruirCharts(){
 
 function fmt(v){ return 'R$ ' + v.toLocaleString('pt-BR', {maximumFractionDigits:0}); }
 
+function renderFormaCards(despesas){
+  const div = document.getElementById('formaCards');
+  div.innerHTML = '';
+  formasPagamento.forEach(f => {
+    const total = despesas.filter(t => t.forma === f).reduce((s,t)=>s+t.valor,0);
+    div.innerHTML += `<div class="forma-card" style="border-left-color:${formaCores[f]}">
+      <div class="forma-icon" style="background:${formaCores[f]}">${formaIcones[f]}</div>
+      <div class="forma-info"><div class="forma-label">${f}</div><div class="forma-value">${fmt(total)}</div></div>
+    </div>`;
+  });
+}
+
 function atualizarDashboard(){
   const dados = getFiltradas();
   const entradas = dados.filter(t => t.tipo === 'entrada');
@@ -394,9 +471,10 @@ function atualizarDashboard(){
   document.getElementById('percDespesas').textContent = totalEntradas > 0
     ? ((totalDespesas/totalEntradas)*100).toFixed(2)+'%' : '';
 
+  renderFormaCards(despesas);
+
   destruirCharts();
 
-  // sparklines simples: saldo acumulado, entradas, despesas ao longo das transações filtradas ordenadas
   const ordenadas = [...dados].sort((a,b)=> new Date(a.data)-new Date(b.data));
   let acc = 0;
   const spSaldo = ordenadas.map(t => acc += (t.tipo==='entrada'? t.valor : -t.valor));
@@ -413,7 +491,6 @@ function atualizarDashboard(){
     options:{plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}}}
   });
 
-  // top5 entradas por categoria
   const agEnt = {};
   entradas.forEach(t => agEnt[t.categoria] = (agEnt[t.categoria]||0)+t.valor);
   const topEnt = Object.entries(agEnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -423,7 +500,6 @@ function atualizarDashboard(){
     options:{ plugins:{legend:{display:false}}, scales:{ y:{ ticks:{color:'#8b93ab'}, grid:{color:'#22305a'} }, x:{ ticks:{color:'#8b93ab'}, grid:{display:false} } } }
   });
 
-  // top5 despesas por categoria (donut)
   const agDesp = {};
   despesas.forEach(t => agDesp[t.categoria] = (agDesp[t.categoria]||0)+t.valor);
   const topDesp = Object.entries(agDesp).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -434,7 +510,6 @@ function atualizarDashboard(){
     options:{ plugins:{legend:{position:'right', labels:{color:'#e8ebf4'}}} }
   });
 
-  // evolução mensal (últimos 6 meses presentes nos dados)
   const meses = {};
   dados.forEach(t => {
     const d = new Date(t.data);
@@ -457,7 +532,6 @@ function atualizarDashboard(){
     options:{ plugins:{legend:{labels:{color:'#e8ebf4'}}}, scales:{ y:{ ticks:{color:'#8b93ab'}, grid:{color:'#22305a'} }, x:{ ticks:{color:'#8b93ab'}, grid:{display:false} } } }
   });
 
-  // cards de categorias principais de despesa
   const iconMap = {'Moradia':'🏠','Lazer':'🎮','Cartão de crédito':'💳','Transporte':'🚗','Supermercado':'🛒','Presentes':'🎁','Plano de saúde':'🏥','Prestação da casa':'🏦','Outros':'📌'};
   const catCards = document.getElementById('catCards');
   catCards.innerHTML = '';
@@ -471,7 +545,6 @@ function atualizarDashboard(){
   renderListaContas();
 }
 
-// ---- Filtros ----
 ['filtroConta','filtroAno','filtroMes','filtroDe','filtroAte'].forEach(id => {
   document.getElementById(id).addEventListener('change', atualizarDashboard);
 });
@@ -496,13 +569,16 @@ document.getElementById('btnNovaConta').addEventListener('click', () => {
 
 // ---- Modal nova transação ----
 const modal = document.getElementById('modalOverlay');
-document.getElementById('fabAdd').addEventListener('click', () => {
+
+function abrirModalTransacao(){
   popularSelectsContas();
   popularSelectCategoria('despesa');
   document.getElementById('inputTexto').value = '';
   document.getElementById('previewInterpretacao').textContent = '';
   modal.classList.add('open');
-});
+}
+
+document.getElementById('fabAdd').addEventListener('click', abrirModalTransacao);
 document.getElementById('btnCancelar').addEventListener('click', () => modal.classList.remove('open'));
 
 document.getElementById('inputTexto').addEventListener('input', (e) => {
@@ -523,7 +599,7 @@ document.getElementById('btnSalvar').addEventListener('click', () => {
     data: new Date().toISOString(),
     conta: document.getElementById('selectConta').value,
     tipo: p.tipo,
-    valor: parseFloat(document.getElementById('previewInterpretacao').textContent.match(/[\d.]+/)?.[0]) || p.valor,
+    valor: p.valor,
     categoria: document.getElementById('selectCategoria').value,
     forma: document.getElementById('selectForma').value,
     textoOriginal: texto
@@ -535,24 +611,40 @@ document.getElementById('btnSalvar').addEventListener('click', () => {
   modal.classList.remove('open');
 });
 
-// Fallback opcional: Web Speech API (não funciona no Safari/iOS, funciona em Chrome)
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
-  const btnMic = document.createElement('button');
-  btnMic.textContent = '🎤';
-  btnMic.className = 'btn';
-  btnMic.style.marginTop = '6px';
-  document.querySelector('.modal .row').appendChild(btnMic);
+// ---- Reconhecimento de voz (Web Speech API) ----
+// Funciona em Chrome/Android. No Safari/iOS não é suportado; use o ditado do teclado no campo de texto.
+let recognitionDisponivel = ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+let recognition = null;
+if (recognitionDisponivel){
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new Recognition();
-  rec.lang = 'pt-BR';
-  btnMic.addEventListener('click', () => rec.start());
-  rec.onresult = (ev) => {
+  recognition = new Recognition();
+  recognition.lang = 'pt-BR';
+  recognition.onresult = (ev) => {
     const texto = ev.results[0][0].transcript;
     const campo = document.getElementById('inputTexto');
     campo.value = texto;
     campo.dispatchEvent(new Event('input'));
   };
+  recognition.onend = () => document.getElementById('fabMic').classList.remove('ouvindo');
+
+  const micInline = document.createElement('button');
+  micInline.className = 'mic-inline';
+  micInline.textContent = '🎤';
+  micInline.type = 'button';
+  micInline.addEventListener('click', () => recognition.start());
+  document.getElementById('micInlineWrap').appendChild(micInline);
 }
+
+document.getElementById('fabMic').addEventListener('click', () => {
+  abrirModalTransacao();
+  setTimeout(() => {
+    document.getElementById('inputTexto').focus();
+    if (recognitionDisponivel){
+      document.getElementById('fabMic').classList.add('ouvindo');
+      recognition.start();
+    }
+  }, 150);
+});
 
 // ---- Inicialização ----
 popularSelectsContas();
