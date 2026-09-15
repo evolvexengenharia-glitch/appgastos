@@ -1,4 +1,4 @@
-const CACHE_NAME = 'FinancaLucas-v2';
+const CACHE_NAME = 'fabridata-v2';
 const ARQUIVOS = [
   './index.html',
   './manifest.json',
